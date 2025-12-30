@@ -65,6 +65,38 @@ go test ./...
 go build -o calsun .
 ```
 
+## Contributing
+
+This project uses [Conventional Commits](https://www.conventionalcommits.org/) and [Semantic Versioning](https://semver.org/).
+
+### Commit Format
+
+```
+type(scope): description
+
+Types:
+  feat:     New feature (minor version bump)
+  fix:      Bug fix (patch version bump)
+  refactor: Code refactoring (patch)
+  docs:     Documentation (patch)
+  chore:    Maintenance (patch)
+
+  BREAKING CHANGE: or type!: triggers major version bump
+```
+
+### Releasing
+
+```bash
+# Preview the next version
+./scripts/release.sh --dry-run
+
+# Create a release tag
+./scripts/release.sh
+
+# Push the tag
+git push origin <tag>
+```
+
 ## License
 
 MIT
