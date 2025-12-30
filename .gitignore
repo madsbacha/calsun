@@ -1,0 +1,17 @@
+# Binary
+calsun
+
+# Plan files
+PLAN.md
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+
+# Nix
+result
