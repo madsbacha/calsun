@@ -108,14 +108,20 @@ func CalendarHandler(w http.ResponseWriter, r *http.Request) {
 		locationStr = fmt.Sprintf("%.4f, %.4f", params.lat, params.lng)
 	}
 
+	// Auto-detect timezone from coordinates
+	tz := services.GetTimezone(params.lat, params.lng)
+
 	// Add events
-	for _, day := range sunTimes {
+	var prevDay *services.DaySunTimes
+	for i := range sunTimes {
+		day := &sunTimes[i]
 		if params.includeSunrise && day.Sunrise != nil {
-			cal.AddVEvent(createSunEvent(day.Sunrise, params.lat, params.lng, locationStr))
+			cal.AddVEvent(createSunEvent(day.Sunrise, day, prevDay, params.lat, params.lng, locationStr, tz))
 		}
 		if params.includeSunset && day.Sunset != nil {
-			cal.AddVEvent(createSunEvent(day.Sunset, params.lat, params.lng, locationStr))
+			cal.AddVEvent(createSunEvent(day.Sunset, day, prevDay, params.lat, params.lng, locationStr, tz))
 		}
+		prevDay = day
 	}
 
 	// Set response headers and write calendar
@@ -139,7 +145,7 @@ func calendarName(name string, includeSunrise, includeSunset bool) string {
 	return base
 }
 
-func createSunEvent(event *services.SunEvent, lat, lng float64, location string) *ics.VEvent {
+func createSunEvent(event *services.SunEvent, day *services.DaySunTimes, prevDay *services.DaySunTimes, lat, lng float64, location string, tz *time.Location) *ics.VEvent {
 	uid := generateUID(event.Time, lat, lng, event.Type)
 	e := ics.NewEvent(uid)
 
@@ -147,20 +153,77 @@ func createSunEvent(event *services.SunEvent, lat, lng float64, location string)
 	e.SetStartAt(event.Time)
 	e.SetEndAt(event.Time.Add(time.Minute))
 
-	// Set title (capitalize event type: "sunrise" -> "Sunrise")
-	e.SetSummary(strings.ToUpper(event.Type[:1]) + event.Type[1:])
+	// Set title with local time (e.g., "Sunrise 06:42")
+	localTime := event.Time.In(tz)
+	eventTitle := strings.ToUpper(event.Type[:1]) + event.Type[1:]
+	e.SetSummary(fmt.Sprintf("%s %s", eventTitle, localTime.Format("15:04")))
 
-	// Set description with detailed info
-	e.SetDescription(fmt.Sprintf(
-		"Time: %s\nLocation: %s\nCoordinates: %.4f, %.4f\nAzimuth: %.1f°",
-		event.Time.Format("15:04:05"),
-		location,
-		lat, lng,
-		event.Azimuth,
-	))
+	// Build enhanced description
+	description := buildDescription(event, day, prevDay, lat, lng, location, tz)
+	e.SetDescription(description)
 	e.SetLocation(location)
 
 	return e
+}
+
+func buildDescription(event *services.SunEvent, day *services.DaySunTimes, prevDay *services.DaySunTimes, lat, lng float64, location string, tz *time.Location) string {
+	var lines []string
+
+	// Basic info (show local time)
+	localTime := event.Time.In(tz)
+	lines = append(lines, fmt.Sprintf("Time: %s", localTime.Format("15:04:05")))
+	lines = append(lines, fmt.Sprintf("Location: %s", location))
+	lines = append(lines, fmt.Sprintf("Coordinates: %.4f, %.4f", lat, lng))
+	lines = append(lines, fmt.Sprintf("Azimuth: %.1f°", event.Azimuth))
+	lines = append(lines, "") // blank line
+
+	// Day length (only if both sunrise and sunset exist)
+	if day.Sunrise != nil && day.Sunset != nil {
+		dayLength := day.Sunset.Time.Sub(day.Sunrise.Time)
+		hours := int(dayLength.Hours())
+		minutes := int(dayLength.Minutes()) % 60
+		lines = append(lines, fmt.Sprintf("Day length: %dh %dm", hours, minutes))
+	}
+
+	// Delta from yesterday
+	if prevDay != nil {
+		var prevEvent *services.SunEvent
+		if event.Type == "sunrise" {
+			prevEvent = prevDay.Sunrise
+		} else {
+			prevEvent = prevDay.Sunset
+		}
+
+		if prevEvent != nil {
+			// Compare times by extracting just hour/minute/second in local timezone
+			prevLocalTime := prevEvent.Time.In(tz)
+			todaySeconds := localTime.Hour()*3600 + localTime.Minute()*60 + localTime.Second()
+			yesterdaySeconds := prevLocalTime.Hour()*3600 + prevLocalTime.Minute()*60 + prevLocalTime.Second()
+			deltaSeconds := todaySeconds - yesterdaySeconds
+			deltaMinutes := deltaSeconds / 60
+
+			if deltaMinutes != 0 {
+				direction := "later"
+				if deltaMinutes < 0 {
+					direction = "earlier"
+					deltaMinutes = -deltaMinutes
+				}
+				lines = append(lines, fmt.Sprintf("Yesterday: %dm %s", deltaMinutes, direction))
+			} else {
+				lines = append(lines, "Yesterday: same time")
+			}
+		}
+	}
+
+	// Days until next solstice
+	days, solsticeType := services.DaysUntilNextSolstice(event.Time)
+	if days == 0 {
+		lines = append(lines, fmt.Sprintf("Today is the %s solstice!", solsticeType))
+	} else {
+		lines = append(lines, fmt.Sprintf("Next solstice: %d days (%s)", days, solsticeType))
+	}
+
+	return strings.Join(lines, "\n")
 }
 
 func generateUID(t time.Time, lat, lng float64, eventType string) string {

@@ -4,6 +4,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/bradfitz/latlong"
 	"github.com/sixdouglas/suncalc"
 )
 
@@ -63,4 +64,55 @@ func GetSunTimesRange(lat, lng float64, startDate time.Time, days int) []DaySunT
 // radToDeg converts radians to degrees
 func radToDeg(rad float64) float64 {
 	return rad * 180 / math.Pi
+}
+
+// DaysUntilNextSolstice calculates the days until the next solstice
+// Returns the number of days and the type of solstice ("summer" or "winter")
+func DaysUntilNextSolstice(date time.Time) (int, string) {
+	year := date.Year()
+
+	// Approximate solstice dates (using UTC)
+	summerSolstice := time.Date(year, time.June, 21, 0, 0, 0, 0, time.UTC)
+	winterSolstice := time.Date(year, time.December, 21, 0, 0, 0, 0, time.UTC)
+
+	// Normalize date to start of day in UTC for comparison
+	dateNorm := time.Date(year, date.Month(), date.Day(), 0, 0, 0, 0, time.UTC)
+
+	// Calculate days to each solstice
+	daysToSummer := int(summerSolstice.Sub(dateNorm).Hours() / 24)
+	daysToWinter := int(winterSolstice.Sub(dateNorm).Hours() / 24)
+
+	// If summer solstice has passed this year, use next year's
+	if daysToSummer < 0 {
+		summerSolstice = time.Date(year+1, time.June, 21, 0, 0, 0, 0, time.UTC)
+		daysToSummer = int(summerSolstice.Sub(dateNorm).Hours() / 24)
+	}
+
+	// If winter solstice has passed this year, use next year's
+	if daysToWinter < 0 {
+		winterSolstice = time.Date(year+1, time.December, 21, 0, 0, 0, 0, time.UTC)
+		daysToWinter = int(winterSolstice.Sub(dateNorm).Hours() / 24)
+	}
+
+	// Return the closest solstice
+	if daysToSummer <= daysToWinter {
+		return daysToSummer, "summer"
+	}
+	return daysToWinter, "winter"
+}
+
+// GetTimezone returns the timezone for a given latitude and longitude.
+// Returns UTC if the timezone cannot be determined.
+func GetTimezone(lat, lng float64) *time.Location {
+	zoneName := latlong.LookupZoneName(lat, lng)
+	if zoneName == "" {
+		return time.UTC
+	}
+
+	loc, err := time.LoadLocation(zoneName)
+	if err != nil {
+		return time.UTC
+	}
+
+	return loc
 }
