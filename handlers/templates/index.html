@@ -5,17 +5,36 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CalSun - Sunrise & Sunset Calendar</title>
     <style>
+        /* CSS Custom Properties for consistent theming */
+        :root {
+            --color-primary: #111;
+            --color-primary-hover: #333;
+            --color-text: #111;
+            --color-text-muted: #666;
+            --color-background: #fff;
+            --color-background-subtle: #fafafa;
+            --color-border: #ddd;
+            --color-border-light: #eee;
+            --color-error: #c00;
+            --color-success: #080;
+            --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+            --radius: 4px;
+            --font-size-sm: 0.875rem;
+            --font-size-base: 1rem;
+        }
+
         * {
             box-sizing: border-box;
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            font-family: var(--font-sans);
             max-width: 480px;
             margin: 0 auto;
             padding: 4rem 1.5rem;
-            background: #fff;
-            color: #111;
+            background: var(--color-background);
+            color: var(--color-text);
             line-height: 1.5;
         }
 
@@ -26,7 +45,7 @@
         }
 
         .subtitle {
-            color: #666;
+            color: var(--color-text-muted);
             margin-bottom: 3rem;
             font-size: 0.95rem;
         }
@@ -39,20 +58,20 @@
             display: block;
             margin-bottom: 0.5rem;
             font-weight: 500;
-            font-size: 0.875rem;
+            font-size: var(--font-size-sm);
         }
 
         input[type="text"] {
             width: 100%;
             padding: 0.625rem 0.75rem;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 1rem;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius);
+            font-size: var(--font-size-base);
         }
 
         input[type="text"]:focus {
             outline: none;
-            border-color: #111;
+            border-color: var(--color-primary);
         }
 
         .radio-group {
@@ -75,28 +94,28 @@
 
         button {
             padding: 0.625rem 1.25rem;
-            border: 1px solid #111;
-            border-radius: 4px;
-            font-size: 0.875rem;
+            border: 1px solid var(--color-primary);
+            border-radius: var(--radius);
+            font-size: var(--font-size-sm);
             font-weight: 500;
             cursor: pointer;
-            background: #fff;
-            color: #111;
+            background: var(--color-background);
+            color: var(--color-primary);
         }
 
         button:hover {
-            background: #111;
-            color: #fff;
+            background: var(--color-primary);
+            color: var(--color-background);
         }
 
         .btn-primary {
             width: 100%;
-            background: #111;
-            color: #fff;
+            background: var(--color-primary);
+            color: var(--color-background);
         }
 
         .btn-primary:hover {
-            background: #333;
+            background: var(--color-primary-hover);
         }
 
         .btn-primary:disabled {
@@ -108,7 +127,7 @@
             display: none;
             margin-top: 2rem;
             padding-top: 2rem;
-            border-top: 1px solid #eee;
+            border-top: 1px solid var(--color-border-light);
         }
 
         .result.show {
@@ -116,20 +135,20 @@
         }
 
         .result-label {
-            font-size: 0.875rem;
-            color: #666;
+            font-size: var(--font-size-sm);
+            color: var(--color-text-muted);
             margin-bottom: 0.5rem;
         }
 
         .result-url {
             word-break: break-all;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+            font-family: var(--font-mono);
             font-size: 0.8rem;
             padding: 0.75rem;
-            border: 1px solid #eee;
-            border-radius: 4px;
+            border: 1px solid var(--color-border-light);
+            border-radius: var(--radius);
             margin-bottom: 1rem;
-            background: #fafafa;
+            background: var(--color-background-subtle);
         }
 
         .btn-group {
@@ -142,20 +161,20 @@
         }
 
         .error {
-            color: #c00;
-            font-size: 0.875rem;
+            color: var(--color-error);
+            font-size: var(--font-size-sm);
             margin-top: 0.5rem;
         }
 
         .success {
-            color: #080;
-            font-size: 0.875rem;
+            color: var(--color-success);
+            font-size: var(--font-size-sm);
             margin-top: 0.5rem;
         }
 
         .location-info {
-            font-size: 0.875rem;
-            color: #666;
+            font-size: var(--font-size-sm);
+            color: var(--color-text-muted);
             margin-top: 0.5rem;
         }
     </style>
@@ -204,36 +223,103 @@
     </div>
 
     <script>
-        let currentLat = null;
-        let currentLng = null;
-        let currentName = null;
+        // Configuration constants
+        const DEBOUNCE_DELAY_MS = 500;
+        const SUCCESS_MESSAGE_DURATION_MS = 2000;
+        const COORDINATE_PATTERNS = [
+            /^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/,  // "55.67, 12.56"
+            /^(-?\d+\.?\d*)\s+(-?\d+\.?\d*)$/       // "55.67 12.56"
+        ];
+
+        // Current location state
+        let currentLocation = { lat: null, lng: null, name: null };
         let debounceTimer = null;
 
-        const addressInput = document.getElementById('address');
-        const locationInfo = document.getElementById('locationInfo');
-        const addressError = document.getElementById('addressError');
-        const generateBtn = document.getElementById('generateBtn');
-        const result = document.getElementById('result');
-        const resultUrl = document.getElementById('resultUrl');
-        const copyBtn = document.getElementById('copyBtn');
-        const subscribeBtn = document.getElementById('subscribeBtn');
-        const copySuccess = document.getElementById('copySuccess');
+        // DOM element references
+        const elements = {
+            addressInput: document.getElementById('address'),
+            locationInfo: document.getElementById('locationInfo'),
+            addressError: document.getElementById('addressError'),
+            calForm: document.getElementById('calForm'),
+            resultSection: document.getElementById('result'),
+            resultUrl: document.getElementById('resultUrl'),
+            copyBtn: document.getElementById('copyBtn'),
+            subscribeBtn: document.getElementById('subscribeBtn'),
+            copySuccess: document.getElementById('copySuccess')
+        };
 
-        // Geocode address using OpenStreetMap Nominatim
+        // Utility: Show temporary success message
+        function showSuccessMessage(message) {
+            elements.copySuccess.textContent = message;
+            setTimeout(() => { elements.copySuccess.textContent = ''; }, SUCCESS_MESSAGE_DURATION_MS);
+        }
+
+        // Utility: Copy text to clipboard with fallback for older browsers
+        async function copyToClipboard(text) {
+            try {
+                await navigator.clipboard.writeText(text);
+            } catch {
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+            }
+        }
+
+        // Utility: Format coordinates for display
+        function formatCoordinates(lat, lng) {
+            return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+        }
+
+        // Utility: Check if coordinates are valid
+        function isValidCoordinate(lat, lng) {
+            return lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+        }
+
+        // Utility: Update current location state
+        function setCurrentLocation(lat, lng, name) {
+            currentLocation = { lat, lng, name };
+        }
+
+        // Utility: Clear current location state
+        function clearCurrentLocation() {
+            setCurrentLocation(null, null, null);
+        }
+
+        // Parse input string as coordinates if possible
+        function parseCoordinates(input) {
+            for (const pattern of COORDINATE_PATTERNS) {
+                const match = input.match(pattern);
+                if (match) {
+                    const lat = parseFloat(match[1]);
+                    const lng = parseFloat(match[2]);
+                    if (isValidCoordinate(lat, lng)) {
+                        return { lat, lng, name: formatCoordinates(lat, lng) };
+                    }
+                }
+            }
+            return null;
+        }
+
+        // Geocode address using OpenStreetMap Nominatim API
         async function geocodeAddress(query) {
             const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`;
 
             try {
                 const response = await fetch(url, {
-                    headers: {
-                        'User-Agent': 'CalSun Calendar Service'
-                    }
+                    headers: { 'User-Agent': 'CalSun Calendar Service' }
                 });
 
-                if (!response.ok) throw new Error('Geocoding failed');
+                if (!response.ok) {
+                    throw new Error('Geocoding failed');
+                }
 
                 const data = await response.json();
-                if (data.length === 0) return null;
+                if (data.length === 0) {
+                    return null;
+                }
 
                 return {
                     lat: parseFloat(data[0].lat),
@@ -246,115 +332,97 @@
             }
         }
 
-        // Check if input looks like coordinates
-        function parseCoordinates(input) {
-            const patterns = [
-                /^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/,  // "55.67, 12.56"
-                /^(-?\d+\.?\d*)\s+(-?\d+\.?\d*)$/       // "55.67 12.56"
-            ];
+        // Build calendar subscription URL from current state
+        function buildCalendarUrl() {
+            const baseUrl = `${window.location.origin}/calendar.ics`;
+            const params = new URLSearchParams();
 
-            for (const pattern of patterns) {
-                const match = input.match(pattern);
-                if (match) {
-                    const lat = parseFloat(match[1]);
-                    const lng = parseFloat(match[2]);
-                    if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
-                        return { lat, lng, name: `${lat.toFixed(4)}, ${lng.toFixed(4)}` };
-                    }
-                }
+            params.set('lat', currentLocation.lat.toFixed(6));
+            params.set('lng', currentLocation.lng.toFixed(6));
+
+            if (currentLocation.name) {
+                params.set('name', currentLocation.name);
             }
-            return null;
+
+            const selectedEvents = document.querySelector('input[name="events"]:checked').value;
+            if (selectedEvents === 'sunrise') {
+                params.set('exclude', 'sunset');
+            } else if (selectedEvents === 'sunset') {
+                params.set('exclude', 'sunrise');
+            }
+
+            return `${baseUrl}?${params.toString()}`;
         }
 
-        // Handle address input changes
-        addressInput.addEventListener('input', function() {
+        // Convert HTTP(S) URL to webcal URL for calendar subscription
+        function toWebcalUrl(url) {
+            return url.replace(/^https?:\/\//, 'webcal://');
+        }
+
+        // Handle address input changes with debounced geocoding
+        elements.addressInput.addEventListener('input', function() {
             clearTimeout(debounceTimer);
-            currentLat = null;
-            currentLng = null;
-            currentName = null;
-            locationInfo.textContent = '';
-            addressError.textContent = '';
+            clearCurrentLocation();
+            elements.locationInfo.textContent = '';
+            elements.addressError.textContent = '';
 
             const value = this.value.trim();
-            if (!value) return;
-
-            // Check for direct coordinates first
-            const coords = parseCoordinates(value);
-            if (coords) {
-                currentLat = coords.lat;
-                currentLng = coords.lng;
-                currentName = coords.name;
-                locationInfo.textContent = `Coordinates: ${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}`;
+            if (!value) {
                 return;
             }
 
-            // Debounce geocoding requests
-            debounceTimer = setTimeout(async () => {
-                locationInfo.textContent = 'Looking up location...';
+            // Try parsing as coordinates first (no API call needed)
+            const coords = parseCoordinates(value);
+            if (coords) {
+                setCurrentLocation(coords.lat, coords.lng, coords.name);
+                elements.locationInfo.textContent = `Coordinates: ${formatCoordinates(coords.lat, coords.lng)}`;
+                return;
+            }
 
-                const result = await geocodeAddress(value);
-                if (result) {
-                    currentLat = result.lat;
-                    currentLng = result.lng;
-                    currentName = result.name;
-                    locationInfo.textContent = `Found: ${result.name} (${result.lat.toFixed(4)}, ${result.lng.toFixed(4)})`;
-                    addressError.textContent = '';
+            // Debounce geocoding API requests
+            debounceTimer = setTimeout(async () => {
+                elements.locationInfo.textContent = 'Looking up location...';
+
+                const geocodeResult = await geocodeAddress(value);
+                if (geocodeResult) {
+                    setCurrentLocation(geocodeResult.lat, geocodeResult.lng, geocodeResult.name);
+                    elements.locationInfo.textContent = `Found: ${geocodeResult.name} (${formatCoordinates(geocodeResult.lat, geocodeResult.lng)})`;
+                    elements.addressError.textContent = '';
                 } else {
-                    locationInfo.textContent = '';
-                    addressError.textContent = 'Location not found. Try a different search or enter coordinates directly.';
+                    elements.locationInfo.textContent = '';
+                    elements.addressError.textContent = 'Location not found. Try a different search or enter coordinates directly.';
                 }
-            }, 500);
+            }, DEBOUNCE_DELAY_MS);
         });
 
         // Handle form submission
-        document.getElementById('calForm').addEventListener('submit', function(e) {
+        elements.calForm.addEventListener('submit', function(e) {
             e.preventDefault();
 
-            if (currentLat === null || currentLng === null) {
-                addressError.textContent = 'Please enter a valid location';
+            if (currentLocation.lat === null || currentLocation.lng === null) {
+                elements.addressError.textContent = 'Please enter a valid location';
                 return;
             }
 
-            // Build URL
-            const baseUrl = window.location.origin + '/calendar.ics';
-            const params = new URLSearchParams();
-            params.set('lat', currentLat.toFixed(6));
-            params.set('lng', currentLng.toFixed(6));
-            if (currentName) params.set('name', currentName);
+            const calUrl = buildCalendarUrl();
 
-            const events = document.querySelector('input[name="events"]:checked').value;
-            if (events === 'sunrise') params.set('exclude', 'sunset');
-            if (events === 'sunset') params.set('exclude', 'sunrise');
-
-            const calUrl = `${baseUrl}?${params.toString()}`;
-
-            resultUrl.textContent = calUrl;
-            result.classList.add('show');
-            copySuccess.textContent = '';
-
-            // Store URL for buttons
-            subscribeBtn.onclick = () => {
-                window.location.href = calUrl.replace('http://', 'webcal://').replace('https://', 'webcal://');
-            };
+            elements.resultUrl.textContent = calUrl;
+            elements.resultSection.classList.add('show');
+            elements.copySuccess.textContent = '';
         });
 
-        // Copy URL button
-        copyBtn.addEventListener('click', async function() {
-            try {
-                await navigator.clipboard.writeText(resultUrl.textContent);
-                copySuccess.textContent = 'Copied to clipboard!';
-                setTimeout(() => copySuccess.textContent = '', 2000);
-            } catch (err) {
-                // Fallback for older browsers
-                const textarea = document.createElement('textarea');
-                textarea.value = resultUrl.textContent;
-                document.body.appendChild(textarea);
-                textarea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textarea);
-                copySuccess.textContent = 'Copied to clipboard!';
-                setTimeout(() => copySuccess.textContent = '', 2000);
+        // Handle subscribe button click
+        elements.subscribeBtn.addEventListener('click', function() {
+            const calUrl = elements.resultUrl.textContent;
+            if (calUrl) {
+                window.location.href = toWebcalUrl(calUrl);
             }
+        });
+
+        // Handle copy button click
+        elements.copyBtn.addEventListener('click', async function() {
+            await copyToClipboard(elements.resultUrl.textContent);
+            showSuccessMessage('Copied to clipboard!');
         });
     </script>
 </body>
