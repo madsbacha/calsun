@@ -24,6 +24,21 @@
             --font-size-base: 1rem;
         }
 
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --color-primary: #fff;
+                --color-primary-hover: #ddd;
+                --color-text: #e5e5e5;
+                --color-text-muted: #999;
+                --color-background: #111;
+                --color-background-subtle: #1a1a1a;
+                --color-border: #333;
+                --color-border-light: #222;
+                --color-error: #f66;
+                --color-success: #6c6;
+            }
+        }
+
         * {
             box-sizing: border-box;
         }
