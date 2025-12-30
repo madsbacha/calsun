@@ -47,6 +47,13 @@ Test coverage:
 - All astronomy logic is in `services/sun.go`
 - Uses `github.com/sixdouglas/suncalc` library
 
+## Commits and Releases
+
+- Use conventional commit format: `type(scope): description`
+- Types: `feat:`, `fix:`, `refactor:`, `docs:`, `chore:`
+- Use `BREAKING CHANGE:` or `type!:` for breaking changes
+- After significant changes are pushed, remind the user to create a release with `./scripts/release.sh`
+
 ## Important Notes
 
 - Calendar endpoint must return `Content-Type: text/calendar; charset=utf-8`
