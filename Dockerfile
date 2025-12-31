@@ -16,6 +16,9 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o calsun .
 # Runtime stage
 FROM alpine:latest
 
+# Install timezone data for proper timezone handling
+RUN apk add --no-cache tzdata
+
 WORKDIR /app
 
 # Copy the binary
