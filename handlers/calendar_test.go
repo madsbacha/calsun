@@ -146,10 +146,10 @@ func TestCalendarHandler_CustomDays(t *testing.T) {
 
 	body := w.Body.String()
 
-	// Count events (should be ~14: 7 sunrises + 7 sunsets)
+	// Count events (should be ~42: 21 days × 2 events, includes 14 past days + 7 future days)
 	eventCount := strings.Count(body, "BEGIN:VEVENT")
-	if eventCount < 12 || eventCount > 16 {
-		t.Errorf("expected ~14 events for 7 days, got %d", eventCount)
+	if eventCount < 40 || eventCount > 44 {
+		t.Errorf("expected ~42 events for 7+14 days, got %d", eventCount)
 	}
 }
 

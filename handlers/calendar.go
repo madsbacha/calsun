@@ -16,6 +16,7 @@ import (
 const (
 	defaultDays = 30
 	maxDays     = 90
+	pastDays    = 14
 )
 
 // calendarParams holds the validated parameters for calendar generation
@@ -98,9 +99,9 @@ func CalendarHandler(w http.ResponseWriter, r *http.Request) {
 	cal.SetName(calName)
 	cal.SetXWRCalName(calName)
 
-	// Get sun times for the date range
-	startDate := time.Now().Truncate(24 * time.Hour)
-	sunTimes := services.GetSunTimesRange(params.lat, params.lng, startDate, params.days)
+	// Get sun times for the date range (including past 14 days)
+	startDate := time.Now().Truncate(24 * time.Hour).AddDate(0, 0, -pastDays)
+	sunTimes := services.GetSunTimesRange(params.lat, params.lng, startDate, params.days+pastDays)
 
 	// Location name for descriptions (use coordinates if no name provided)
 	locationStr := params.name
