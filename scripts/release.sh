@@ -195,7 +195,7 @@ main() {
     fi
 
     # Create annotated tag
-    git tag -a "$new_version" -m "$new_version"$'\n\n'"$notes"
+    git tag -s "$new_version" -m "$new_version"$'\n\n'"$notes"
 
     echo -e "${GREEN}Created tag ${new_version}${NC}"
     echo ""
